@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>บัญชีโจ๊กบางกอก</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F5EEE1;
+    --surface:#FFFFFF;
+    --surface-alt:#FBF7EF;
+    --text:#2B2420;
+    --text-soft:#7A6F63;
+    --line:#E4DBC9;
+    --brand:#C1573E;
+    --brand-dark:#8B3A2E;
+    --income:#4C7A52;
+    --income-bg:#E9F0E7;
+    --expense:#B8452F;
+    --expense-bg:#F7E9E3;
+    --fix:#8B3A2E;
+    --variable:#4C7A52;
+    --onetime:#C98A2C;
+    --shadow: 0 2px 10px rgba(43,36,32,0.07), 0 1px 2px rgba(43,36,32,0.06);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Sarabun',sans-serif;
+    -webkit-font-smoothing:antialiased;
+    padding-bottom:78px;
+    min-height:100vh;
+  }
+  h1,h2,h3,.display{font-family:'Kanit',sans-serif;}
+  button{font-family:inherit;}
+  input,select{font-family:'Sarabun',sans-serif;}
+
+  /* ── Header ───────────────────────── */
+  .topbar{
+    position:sticky; top:0; z-index:20;
+    background:var(--brand);
+    color:#fff;
+    padding:14px 18px 16px;
+    display:flex; align-items:center; justify-content:space-between;
+    box-shadow:var(--shadow);
+  }
+  .topbar .brand{display:flex; align-items:center; gap:10px;}
+  .topbar .brand-name{font-family:'Kanit',sans-serif; font-weight:600; font-size:19px; line-height:1.1;}
+  .topbar .brand-sub{font-size:12px; opacity:0.85; margin-top:1px;}
+  .bowl-icon{width:30px;height:30px;flex-shrink:0;}
+
+  .container{max-width:640px; margin:0 auto; padding:16px;}
+
+  /* ── Cards ───────────────────────── */
+  .card{
+    background:var(--surface);
+    border-radius:14px;
+    box-shadow:var(--shadow);
+    padding:16px;
+    margin-bottom:14px;
+  }
+  .card h3{margin:0 0 12px; font-size:15px; font-weight:600; color:var(--text-soft); letter-spacing:0.2px;}
+
+  /* ── Receipt-style daily summary (signature element) ── */
+  .receipt{
+    position:relative;
+    background:var(--surface-alt);
+    border-radius:14px 14px 0 0;
+    padding:18px 18px 22px;
+    box-shadow:var(--shadow);
+    margin-bottom:22px;
+    border:1px dashed var(--line);
+    border-bottom:none;
+  }
+  .receipt::after{
+    content:'';
+    position:absolute; left:0; right:0; bottom:-11px; height:22px;
+    background: radial-gradient(circle at 11px 0, transparent 11px, var(--bg) 12px) repeat-x;
+    background-size:22px 22px;
+  }
+  .receipt-title{font-family:'Kanit',sans-serif; font-size:13px; color:var(--text-soft); text-transform:uppercase; letter-spacing:0.6px; margin-bottom:10px;}
+  .receipt-row{display:flex; justify-content:space-between; padding:6px 0; font-size:15px; border-bottom:1px dashed var(--line);}
+  .receipt-row:last-of-type{border-bottom:none;}
+  .receipt-row .label{color:var(--text-soft);}
+  .receipt-row .val{font-weight:600; font-variant-numeric:tabular-nums;}
+  .receipt-total{display:flex; justify-content:space-between; align-items:baseline; margin-top:10px; padding-top:10px; border-top:2px solid var(--text);}
+  .receipt-total .label{font-family:'Kanit',sans-serif; font-weight:600; font-size:15px;}
+  .receipt-total .val{font-family:'Kanit',sans-serif; font-weight:700; font-size:26px;}
+  .profit-pos{color:var(--income);}
+  .profit-neg{color:var(--expense);}
+
+  /* ── Dashboard stat grid ─────────── */
+  .stat-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px;}
+  .stat{background:var(--surface); border-radius:12px; padding:14px; box-shadow:var(--shadow);}
+  .stat .stat-label{font-size:12px; color:var(--text-soft); margin-bottom:6px;}
+  .stat .stat-val{font-family:'Kanit',sans-serif; font-weight:600; font-size:20px; font-variant-numeric:tabular-nums;}
+  .stat.income .stat-val{color:var(--income);}
+  .stat.expense .stat-val{color:var(--expense);}
+
+  /* ── Forms ───────────────────────── */
+  .field{margin-bottom:10px;}
+  .field label{display:block; font-size:12.5px; color:var(--text-soft); margin-bottom:4px;}
+  .field input, .field select{
+    width:100%; padding:11px 12px; border:1px solid var(--line); border-radius:9px;
+    background:var(--surface-alt); font-size:15px; color:var(--text);
+  }
+  .field input:focus, .field select:focus{outline:2px solid var(--brand); outline-offset:1px; background:#fff;}
+  .row2{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:6px;
+    padding:11px 16px; border-radius:10px; border:none; cursor:pointer;
+    font-size:14.5px; font-weight:600; font-family:'Sarabun',sans-serif;
+    transition:transform .08s ease, opacity .15s ease;
+  }
+  .btn:active{transform:scale(0.97);}
+  .btn-primary{background:var(--brand); color:#fff; width:100%;}
+  .btn-primary:hover{background:var(--brand-dark);}
+  .btn-outline{background:transparent; color:var(--brand-dark); border:1.5px solid var(--brand-dark);}
+  .btn-ghost{background:var(--surface-alt); color:var(--text); border:1px solid var(--line);}
+  .btn-sm{padding:7px 10px; font-size:13px; border-radius:8px;}
+  .btn-del{background:none; border:none; color:var(--expense); font-size:13px; cursor:pointer; padding:4px 6px;}
+
+  /* ── Entry list rows ─────────────── */
+  .entry-list{margin-top:4px;}
+  .entry-item{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:10px 0; border-bottom:1px solid var(--line);
+  }
+  .entry-item:last-child{border-bottom:none;}
+  .entry-main{flex:1; min-width:0;}
+  .entry-title{font-size:14.5px; font-weight:600;}
+  .entry-note{font-size:12.5px; color:var(--text-soft); margin-top:1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .entry-amt{font-weight:600; font-variant-numeric:tabular-nums; margin-right:8px; white-space:nowrap;}
+  .tag{display:inline-block; font-size:11px; padding:2px 7px; border-radius:20px; font-weight:600; margin-left:6px;}
+  .tag-fix{background:rgba(139,58,46,0.12); color:var(--fix);}
+  .tag-variable{background:rgba(76,122,82,0.12); color:var(--variable);}
+  .tag-onetime{background:rgba(201,138,44,0.14); color:var(--onetime);}
+  .empty-note{color:var(--text-soft); font-size:13.5px; text-align:center; padding:18px 0;}
+
+  /* ── Tabs (bottom nav) ───────────── */
+  .tabbar{
+    position:fixed; bottom:0; left:0; right:0; z-index:30;
+    background:var(--surface); border-top:1px solid var(--line);
+    display:flex; padding:6px 6px calc(6px + env(safe-area-inset-bottom));
+    box-shadow:0 -2px 10px rgba(43,36,32,0.06);
+  }
+  .tab-btn{
+    flex:1; background:none; border:none; display:flex; flex-direction:column; align-items:center; gap:3px;
+    padding:8px 2px; color:var(--text-soft); font-size:11px; cursor:pointer; border-radius:10px;
+  }
+  .tab-btn svg{width:22px; height:22px;}
+  .tab-btn.active{color:var(--brand-dark); background:var(--surface-alt);}
+
+  /* ── Segmented control (history view) ── */
+  .segmented{display:flex; background:var(--surface-alt); border-radius:10px; padding:3px; margin-bottom:14px; border:1px solid var(--line);}
+  .segmented button{flex:1; padding:8px 4px; border:none; background:none; border-radius:8px; font-size:13px; font-weight:600; color:var(--text-soft); cursor:pointer;}
+  .segmented button.active{background:var(--brand); color:#fff;}
+
+  .hist-row{display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid var(--line); cursor:pointer;}
+  .hist-row:last-child{border-bottom:none;}
+  .hist-period{font-weight:600; font-size:14.5px;}
+  .hist-nums{text-align:right; font-size:12.5px; color:var(--text-soft);}
+  .hist-nums .profit{font-weight:700; font-size:15px; margin-left:8px;}
+
+  .chart-wrap{overflow-x:auto;}
+  .bar-row{display:flex; align-items:center; gap:8px; margin-bottom:8px;}
+  .bar-label{width:88px; flex-shrink:0; font-size:12.5px; color:var(--text-soft); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .bar-track{flex:1; background:var(--surface-alt); border-radius:6px; height:16px; position:relative; overflow:hidden;}
+  .bar-fill{height:100%; border-radius:6px;}
+  .bar-val{width:74px; text-align:right; font-size:12.5px; font-weight:600; flex-shrink:0;}
+
+  .section-title{font-family:'Kanit',sans-serif; font-weight:600; font-size:16px; margin:4px 0 10px;}
+
+  .modal-bg{
+    position:fixed; inset:0; background:rgba(43,36,32,0.45); z-index:40;
+    display:flex; align-items:flex-end; justify-content:center;
+  }
+  .modal{
+    background:var(--surface); width:100%; max-width:640px; border-radius:18px 18px 0 0;
+    padding:18px 18px calc(18px + env(safe-area-inset-bottom)); max-height:82vh; overflow-y:auto;
+  }
+  .modal-handle{width:40px; height:4px; background:var(--line); border-radius:4px; margin:0 auto 14px;}
+  .modal h3{font-family:'Kanit',sans-serif; font-size:17px; margin:0 0 12px;}
+
+  .toast{
+    position:fixed; bottom:92px; left:50%; transform:translateX(-50%);
+    background:var(--text); color:#fff; padding:9px 18px; border-radius:20px; font-size:13.5px;
+    z-index:60; opacity:0; transition:opacity .25s ease; pointer-events:none;
+  }
+  .toast.show{opacity:1;}
+
+  .cat-item{display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--line);}
+  .cat-item:last-child{border-bottom:none;}
+  .cat-name{font-weight:600; font-size:14.5px;}
+  .cat-item select{width:auto; padding:6px 8px; font-size:13px;}
+
+  @media print{
+    .tabbar,.topbar,.no-print{display:none !important;}
+    body{padding:0; background:#fff;}
+    .card{box-shadow:none; border:1px solid #ccc;}
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <svg class="bowl-icon" viewBox="0 0 32 32" fill="none">
+      <path d="M4 15h24a12 12 0 0 1-24 0Z" fill="#fff" opacity="0.95"/>
+      <path d="M13 8c-1 1.5-1 3 0.5 4M17 6c-1 1.8-1 3.4 0.6 4.6M21 8.5c-0.8 1.2-0.8 2.5 0.3 3.5" stroke="#fff" stroke-width="1.6" stroke-linecap="round" opacity="0.85"/>
+      <rect x="3" y="15" width="26" height="2.4" rx="1.2" fill="#fff" opacity="0.95"/>
+    </svg>
+    <div>
+      <div class="brand-name">โจ๊กบางกอก</div>
+      <div class="brand-sub" id="header-date"></div>
+    </div>
+  </div>
+</div>
+
+<div class="container" id="app-content"></div>
+
+<div class="tabbar">
+  <button class="tab-btn" data-tab="daily">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+    บันทึกวันนี้
+  </button>
+  <button class="tab-btn" data-tab="dashboard">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V10M11 19V4M18 19v-7"/></svg>
+    Dashboard
+  </button>
+  <button class="tab-btn" data-tab="history">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"/><path d="M12 8v4l3 2"/></svg>
+    ประวัติ
+  </button>
+  <button class="tab-btn" data-tab="settings">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>
+    หมวดหมู่
+  </button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ══════════════════════════ Storage layer ══════════════════════════ */
+const K_INCOME='jrx_income', K_EXPENSE='jrx_expense', K_CATS='jrx_cats';
+
+const DEFAULT_CATS = [
+  ['วัตถุดิบ','Variable'],
+  ['ค่าแรง','Fix'],
+  ['ค่าเช่า','Fix'],
+  ['ค่าน้ำ','Variable'],
+  ['ค่าไฟ','Variable'],
+  ['ค่าแก๊ส','Variable'],
+  ['ค่าของใช้','Variable'],
+  ['ค่าซ่อม','One-time'],
+  ['ค่าเดลิเวอรี่','Variable'],
+  ['อื่นๆ','Variable'],
+];
+const INCOME_SOURCES = ['ยอดขายหน้าร้าน (เงินสด)','โอนเงิน','Grab','Lineman','อื่นๆ'];
+const PAYMENT_METHODS = ['เงินสด','โอนเงิน','บัตรเครดิต'];
+
+function loadJSON(key, fallback){
+  try{
+    const raw = localStorage.getItem(key);
+    if(!raw) return fallback;
+    return JSON.parse(raw);
+  }catch(e){ return fallback; }
+}
+function saveJSON(key, data){
+  try{
+    localStorage.setItem(key, JSON.stringify(data));
+    return true;
+  }catch(e){
+    showToast('บันทึกไม่สำเร็จ: พื้นที่เก็บข้อมูลเต็ม');
+    return false;
+  }
+}
+
+let incomeData = loadJSON(K_INCOME, []);
+let expenseData = loadJSON(K_EXPENSE, []);
+let catMap = loadJSON(K_CATS, null);
+if(!catMap){
+  catMap = {};
+  DEFAULT_CATS.forEach(([c,t])=>catMap[c]=t);
+  saveJSON(K_CATS, catMap);
+}
+
+function persistIncome(){ saveJSON(K_INCOME, incomeData); }
+function persistExpense(){ saveJSON(K_EXPENSE, expenseData); }
+function persistCats(){ saveJSON(K_CATS, catMap); }
+
+/* ══════════════════════════ Utils ══════════════════════════ */
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function todayStr(){ return new Date().toISOString().slice(0,10); }
+function fmt(n){ return Number(n||0).toLocaleString('th-TH',{minimumFractionDigits:0,maximumFractionDigits:2}); }
+function monthKey(d){ return d.slice(0,7); }
+function yearKey(d){ return d.slice(0,4); }
+function weekKey(dStr){
+  const d = new Date(dStr+'T00:00:00');
+  const day = (d.getDay()+6)%7; // Mon=0
+  const monday = new Date(d); monday.setDate(d.getDate()-day);
+  return monday.toISOString().slice(0,10);
+}
+function thaiDate(dStr){
+  const d = new Date(dStr+'T00:00:00');
+  const months=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()+543}`;
+}
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(showToast._tm);
+  showToast._tm = setTimeout(()=>t.classList.remove('show'), 1800);
+}
+function sumBy(arr, filterFn){ return arr.filter(filterFn).reduce((s,x)=>s+Number(x.amount||0),0); }
+
+/* ══════════════════════════ App state ══════════════════════════ */
+let state = {
+  tab: 'daily',
+  entryDate: todayStr(),
+  histView: 'day',
+  histMonthFilter: todayStr().slice(0,7),
+};
+
+/* ══════════════════════════ Render: Daily entry tab ══════════════════════════ */
+function renderDaily(){
+  const d = state.entryDate;
+  const dayIncome = incomeData.filter(x=>x.date===d);
+  const dayExpense = expenseData.filter(x=>x.date===d);
+  const incTotal = dayIncome.reduce((s,x)=>s+Number(x.amount),0);
+  const expTotal = dayExpense.reduce((s,x)=>s+Number(x.amount),0);
+  const profit = incTotal - expTotal;
+
+  const catOptions = Object.keys(catMap).map(c=>`<option value="${c}">${c}</option>`).join('');
+  const srcOptions = INCOME_SOURCES.map(s=>`<option value="${s}">${s}</option>`).join('');
+
+  return `
+    <div class="field" style="margin-bottom:14px;">
+      <label>วันที่บันทึก</label>
+      <input type="date" id="entry-date-picker" value="${d}">
+    </div>
+
+    <div class="receipt">
+      <div class="receipt-title">สรุปวันที่ ${thaiDate(d)}</div>
+      <div class="receipt-row"><span class="label">รายรับรวม</span><span class="val" style="color:var(--income)">${fmt(incTotal)} ฿</span></div>
+      <div class="receipt-row"><span class="label">รายจ่ายรวม</span><span class="val" style="color:var(--expense)">${fmt(expTotal)} ฿</span></div>
+      <div class="receipt-total">
+        <span class="label">กำไร/ขาดทุนวันนี้</span>
+        <span class="val ${profit>=0?'profit-pos':'profit-neg'}">${profit>=0?'+':''}${fmt(profit)} ฿</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>➕ เพิ่มรายรับ</h3>
+      <div class="field"><label>ช่องทาง</label>
+        <select id="inc-source">${srcOptions}</select>
+      </div>
+      <div class="row2">
+        <div class="field"><label>จำนวนเงิน (บาท)</label><input type="number" inputmode="decimal" id="inc-amount" placeholder="0"></div>
+        <div class="field"><label>หมายเหตุ (ถ้ามี)</label><input type="text" id="inc-note" placeholder="เช่น ลูกค้าประจำ"></div>
+      </div>
+      <button class="btn btn-primary" data-action="add-income">บันทึกรายรับ</button>
+
+      <div class="entry-list">
+        ${dayIncome.length===0 ? '<div class="empty-note">ยังไม่มีรายรับวันนี้</div>' :
+          dayIncome.map(x=>`
+            <div class="entry-item">
+              <div class="entry-main">
+                <div class="entry-title">${x.source}</div>
+                ${x.note ? `<div class="entry-note">${x.note}</div>` : ''}
+              </div>
+              <div class="entry-amt" style="color:var(--income)">+${fmt(x.amount)} ฿</div>
+              <button class="btn-del" data-action="del-income" data-id="${x.id}">ลบ</button>
+            </div>`).join('')
+        }
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>➖ เพิ่มรายจ่าย</h3>
+      <div class="row2">
+        <div class="field"><label>หมวดหมู่</label>
+          <select id="exp-category">${catOptions}</select>
+        </div>
+        <div class="field"><label>ประเภทต้นทุน</label>
+          <select id="exp-costtype">
+            <option value="Fix">Fix Cost</option>
+            <option value="Variable">Variable Cost</option>
+            <option value="One-time">One-time Cost</option>
+          </select>
+        </div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>จ่ายแบบไหน</label>
+          <select id="exp-payment">${PAYMENT_METHODS.map(p=>`<option value="${p}">${p}</option>`).join('')}</select>
+        </div>
+        <div class="field"><label>จำนวนเงิน (บาท)</label><input type="number" inputmode="decimal" id="exp-amount" placeholder="0"></div>
+      </div>
+      <div class="field"><label>หมายเหตุ (ถ้ามี)</label><input type="text" id="exp-note" placeholder="เช่น ซื้อข้าวสาร"></div>
+      <button class="btn btn-primary" data-action="add-expense">บันทึกรายจ่าย</button>
+
+      <div class="entry-list">
+        ${dayExpense.length===0 ? '<div class="empty-note">ยังไม่มีรายจ่ายวันนี้</div>' :
+          dayExpense.map(x=>`
+            <div class="entry-item">
+              <div class="entry-main">
+                <div class="entry-title">${x.category} <span class="tag tag-${x.costType.toLowerCase().replace('-','')}">${x.costType}</span></div>
+                <div class="entry-note">${x.payment||'เงินสด'}${x.note ? ' · '+x.note : ''}</div>
+              </div>
+              <div class="entry-amt" style="color:var(--expense)">-${fmt(x.amount)} ฿</div>
+              <button class="btn-del" data-action="del-expense" data-id="${x.id}">ลบ</button>
+            </div>`).join('')
+        }
+      </div>
+    </div>
+  `;
+}
+
+function bindDailyEvents(){
+  const picker = document.getElementById('entry-date-picker');
+  if(picker) picker.addEventListener('change', e=>{ state.entryDate = e.target.value; render(); });
+
+  const catSel = document.getElementById('exp-category');
+  const costSel = document.getElementById('exp-costtype');
+  if(catSel && costSel){
+    catSel.addEventListener('change', ()=>{ costSel.value = catMap[catSel.value] || 'Variable'; });
+    costSel.value = catMap[catSel.value] || 'Variable';
+  }
+}
+
+/* ══════════════════════════ Render: Dashboard tab ══════════════════════════ */
+function renderDashboard(){
+  const today = todayStr();
+  const mKey = monthKey(today);
+
+  const incToday = sumBy(incomeData, x=>x.date===today);
+  const expToday = sumBy(expenseData, x=>x.date===today);
+  const profitToday = incToday - expToday;
+
+  const incMonth = sumBy(incomeData, x=>monthKey(x.date)===mKey);
+  const expMonth = sumBy(expenseData, x=>monthKey(x.date)===mKey);
+  const profitMonth = incMonth - expMonth;
+
+  const fixMonth = sumBy(expenseData, x=>monthKey(x.date)===mKey && x.costType==='Fix');
+
+  // category breakdown this month
+  const catTotals = {};
+  expenseData.filter(x=>monthKey(x.date)===mKey).forEach(x=>{
+    catTotals[x.category] = (catTotals[x.category]||0) + Number(x.amount);
+  });
+  const catEntries = Object.entries(catTotals).sort((a,b)=>b[1]-a[1]);
+  const topCat = catEntries.length ? catEntries[0][0] : '—';
+  const maxCatVal = catEntries.length ? catEntries[0][1] : 1;
+
+  // last 7 days income vs expense
+  const days = [];
+  for(let i=6;i>=0;i--){
+    const dt = new Date(); dt.setDate(dt.getDate()-i);
+    const ds = dt.toISOString().slice(0,10);
+    days.push({date:ds, inc: sumBy(incomeData,x=>x.date===ds), exp: sumBy(expenseData,x=>x.date===ds)});
+  }
+  const maxDayVal = Math.max(1, ...days.map(d=>Math.max(d.inc,d.exp)));
+
+  return `
+    <div class="stat-grid">
+      <div class="stat income"><div class="stat-label">ยอดขายวันนี้</div><div class="stat-val">${fmt(incToday)} ฿</div></div>
+      <div class="stat expense"><div class="stat-label">รายจ่ายวันนี้</div><div class="stat-val">${fmt(expToday)} ฿</div></div>
+      <div class="stat"><div class="stat-label">กำไรวันนี้</div><div class="stat-val ${profitToday>=0?'profit-pos':'profit-neg'}">${profitToday>=0?'+':''}${fmt(profitToday)} ฿</div></div>
+      <div class="stat"><div class="stat-label">กำไรสะสมเดือนนี้</div><div class="stat-val ${profitMonth>=0?'profit-pos':'profit-neg'}">${profitMonth>=0?'+':''}${fmt(profitMonth)} ฿</div></div>
+      <div class="stat"><div class="stat-label">หมวดใช้เงินเยอะสุด (เดือนนี้)</div><div class="stat-val" style="font-size:15px;">${topCat}</div></div>
+      <div class="stat"><div class="stat-label">Fix Cost เดือนนี้</div><div class="stat-val">${fmt(fixMonth)} ฿</div></div>
+    </div>
+
+    <div class="card">
+      <h3>รายรับ-รายจ่าย ย้อนหลัง 7 วัน</h3>
+      <div class="chart-wrap">
+        ${days.map(d=>`
+          <div class="bar-row">
+            <div class="bar-label">${thaiDate(d.date).split(' ').slice(0,2).join(' ')}</div>
+            <div class="bar-track"><div class="bar-fill" style="width:${(d.inc/maxDayVal*100).toFixed(1)}%; background:var(--income)"></div></div>
+            <div class="bar-val" style="color:var(--income)">${fmt(d.inc)}</div>
+          </div>
+          <div class="bar-row" style="margin-top:-4px;">
+            <div class="bar-label"></div>
+            <div class="bar-track"><div class="bar-fill" style="width:${(d.exp/maxDayVal*100).toFixed(1)}%; background:var(--expense)"></div></div>
+            <div class="bar-val" style="color:var(--expense)">${fmt(d.exp)}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>รายจ่ายแยกตามหมวด (เดือนนี้)</h3>
+      ${catEntries.length===0 ? '<div class="empty-note">ยังไม่มีรายจ่ายเดือนนี้</div>' :
+        catEntries.map(([cat,val])=>`
+          <div class="bar-row">
+            <div class="bar-label">${cat}</div>
+            <div class="bar-track"><div class="bar-fill" style="width:${(val/maxCatVal*100).toFixed(1)}%; background:var(--brand)"></div></div>
+            <div class="bar-val">${fmt(val)}</div>
+          </div>
+        `).join('')
+      }
+    </div>
+  `;
+}
+
+/* ══════════════════════════ Render: History tab ══════════════════════════ */
+function aggregateHistory(view){
+  const keyFn = view==='day' ? (d=>d) : view==='week' ? weekKey : view==='month' ? monthKey : yearKey;
+  const map = {};
+  incomeData.forEach(x=>{
+    const k = keyFn(x.date);
+    map[k] = map[k] || {inc:0, exp:0};
+    map[k].inc += Number(x.amount);
+  });
+  expenseData.forEach(x=>{
+    const k = keyFn(x.date);
+    map[k] = map[k] || {inc:0, exp:0};
+    map[k].exp += Number(x.amount);
+  });
+  return Object.entries(map).sort((a,b)=> b[0].localeCompare(a[0]));
+}
+function periodLabel(view, key){
+  if(view==='day') return thaiDate(key);
+  if(view==='week') return `สัปดาห์ของ ${thaiDate(key)}`;
+  if(view==='month'){
+    const [y,m] = key.split('-');
+    const months=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+    return `${months[Number(m)-1]} ${Number(y)+543}`;
+  }
+  return `พ.ศ. ${Number(key)+543}`;
+}
+
+function renderHistory(){
+  const rows = aggregateHistory(state.histView);
+  return `
+    <div class="segmented">
+      ${['day','week','month','year'].map(v=>`<button data-action="hist-view" data-view="${v}" class="${state.histView===v?'active':''}">${{day:'รายวัน',week:'รายสัปดาห์',month:'รายเดือน',year:'รายปี'}[v]}</button>`).join('')}
+    </div>
+
+    <div class="card no-print">
+      <h3>ส่งออกข้อมูล</h3>
+      <div class="row2">
+        <button class="btn btn-outline" data-action="export-csv">📄 Export Excel (CSV)</button>
+        <button class="btn btn-outline" data-action="export-pdf">🖨️ พิมพ์ / PDF</button>
+      </div>
+    </div>
+
+    <div class="card" id="print-area">
+      <h3>ประวัติ${{day:'รายวัน',week:'รายสัปดาห์',month:'รายเดือน',year:'รายปี'}[state.histView]}</h3>
+      ${rows.length===0 ? '<div class="empty-note">ยังไม่มีข้อมูล</div>' :
+        rows.map(([key,v])=>{
+          const profit = v.inc-v.exp;
+          return `
+          <div class="hist-row" data-action="hist-detail" data-key="${key}">
+            <div class="hist-period">${periodLabel(state.histView,key)}</div>
+            <div class="hist-nums">
+              <span style="color:var(--income)">+${fmt(v.inc)}</span> /
+              <span style="color:var(--expense)">-${fmt(v.exp)}</span>
+              <span class="profit ${profit>=0?'profit-pos':'profit-neg'}">${profit>=0?'+':''}${fmt(profit)}</span>
+            </div>
+          </div>`;
+        }).join('')
+      }
+    </div>
+  `;
+}
+
+function showHistDetail(key){
+  const view = state.histView;
+  const keyFn = view==='day' ? (d=>d) : view==='week' ? weekKey : view==='month' ? monthKey : yearKey;
+  const incs = incomeData.filter(x=>keyFn(x.date)===key).sort((a,b)=>a.date.localeCompare(b.date));
+  const exps = expenseData.filter(x=>keyFn(x.date)===key).sort((a,b)=>a.date.localeCompare(b.date));
+
+  const bg = document.createElement('div');
+  bg.className = 'modal-bg';
+  bg.innerHTML = `
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <h3>${periodLabel(view,key)}</h3>
+      <div style="margin-bottom:10px; font-weight:600;">รายรับ</div>
+      ${incs.length===0?'<div class="empty-note">ไม่มีรายรับ</div>':incs.map(x=>`
+        <div class="entry-item"><div class="entry-main"><div class="entry-title">${x.source}</div><div class="entry-note">${thaiDate(x.date)}${x.note?' · '+x.note:''}</div></div><div class="entry-amt" style="color:var(--income)">+${fmt(x.amount)} ฿</div></div>
+      `).join('')}
+      <div style="margin:14px 0 10px; font-weight:600;">รายจ่าย</div>
+      ${exps.length===0?'<div class="empty-note">ไม่มีรายจ่าย</div>':exps.map(x=>`
+        <div class="entry-item"><div class="entry-main"><div class="entry-title">${x.category} <span class="tag tag-${x.costType.toLowerCase().replace('-','')}">${x.costType}</span></div><div class="entry-note">${thaiDate(x.date)} · ${x.payment||'เงินสด'}${x.note?' · '+x.note:''}</div></div><div class="entry-amt" style="color:var(--expense)">-${fmt(x.amount)} ฿</div></div>
+      `).join('')}
+      <button class="btn btn-ghost" style="width:100%; margin-top:14px;" data-action="close-modal">ปิด</button>
+    </div>
+  `;
+  bg.addEventListener('click', e=>{ if(e.target===bg) bg.remove(); });
+  document.body.appendChild(bg);
+}
+
+function exportCSV(){
+  let csv = 'ประเภทรายการ,วันที่,หมวดหมู่/ช่องทาง,ประเภทต้นทุน,จ่ายแบบไหน,จำนวนเงิน,หมายเหตุ\n';
+  incomeData.slice().sort((a,b)=>a.date.localeCompare(b.date)).forEach(x=>{
+    csv += `รายรับ,${x.date},"${x.source}",-,-,${x.amount},"${(x.note||'').replace(/"/g,'')}"\n`;
+  });
+  expenseData.slice().sort((a,b)=>a.date.localeCompare(b.date)).forEach(x=>{
+    csv += `รายจ่าย,${x.date},"${x.category}",${x.costType},${x.payment||'เงินสด'},${x.amount},"${(x.note||'').replace(/"/g,'')}"\n`;
+  });
+  const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `บัญชีโจ๊กบางกอก_${todayStr()}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+  showToast('ดาวน์โหลดไฟล์ CSV แล้ว');
+}
+
+/* ══════════════════════════ Render: Settings tab ══════════════════════════ */
+function renderSettings(){
+  return `
+    <div class="card">
+      <h3>หมวดหมู่รายจ่าย</h3>
+      ${Object.entries(catMap).map(([cat,type])=>`
+        <div class="cat-item">
+          <div class="cat-name">${cat}</div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <select data-action="change-cattype" data-cat="${cat}">
+              <option value="Fix" ${type==='Fix'?'selected':''}>Fix Cost</option>
+              <option value="Variable" ${type==='Variable'?'selected':''}>Variable Cost</option>
+              <option value="One-time" ${type==='One-time'?'selected':''}>One-time Cost</option>
+            </select>
+            <button class="btn-del" data-action="del-cat" data-cat="${cat}">ลบ</button>
+          </div>
+        </div>
+      `).join('')}
+      <div class="row2" style="margin-top:14px;">
+        <input type="text" id="new-cat-name" placeholder="ชื่อหมวดใหม่" style="padding:11px 12px; border:1px solid var(--line); border-radius:9px; background:var(--surface-alt);">
+        <button class="btn btn-outline" data-action="add-cat">+ เพิ่มหมวด</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>สำรอง / กู้คืนข้อมูล</h3>
+      <p style="font-size:13px; color:var(--text-soft); margin-top:0;">ข้อมูลถูกเก็บไว้ในเบราว์เซอร์นี้เท่านั้น แนะนำให้กดสำรองข้อมูลเก็บไว้เป็นประจำ (เช่น ทุกสิ้นเดือน) เผื่อกรณีล้างข้อมูล Safari หรือเปลี่ยนเครื่อง</p>
+      <div class="row2">
+        <button class="btn btn-outline" data-action="backup-json">💾 สำรองข้อมูล (JSON)</button>
+        <label class="btn btn-outline" style="text-align:center;">
+          📂 กู้คืนข้อมูล
+          <input type="file" accept="application/json" id="restore-file" style="display:none;">
+        </label>
+      </div>
+    </div>
+  `;
+}
+
+function backupJSON(){
+  const data = {income:incomeData, expense:expenseData, cats:catMap, exportedAt:new Date().toISOString()};
+  const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `บัญชีโจ๊กบางกอก_สำรอง_${todayStr()}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+  showToast('สำรองข้อมูลแล้ว');
+}
+function restoreJSON(file){
+  const reader = new FileReader();
+  reader.onload = e=>{
+    try{
+      const data = JSON.parse(e.target.result);
+      if(!Array.isArray(data.income) || !Array.isArray(data.expense)) throw new Error('bad format');
+      incomeData = data.income; expenseData = data.expense;
+      if(data.cats) catMap = data.cats;
+      persistIncome(); persistExpense(); persistCats();
+      showToast('กู้คืนข้อมูลสำเร็จ');
+      render();
+    }catch(err){
+      showToast('ไฟล์ไม่ถูกต้อง กู้คืนไม่สำเร็จ');
+    }
+  };
+  reader.readAsText(file);
+}
+
+/* ══════════════════════════ Main render / events ══════════════════════════ */
+function render(){
+  document.getElementById('header-date').textContent = thaiDate(todayStr());
+  const el = document.getElementById('app-content');
+  if(state.tab==='daily'){ el.innerHTML = renderDaily(); bindDailyEvents(); }
+  else if(state.tab==='dashboard'){ el.innerHTML = renderDashboard(); }
+  else if(state.tab==='history'){ el.innerHTML = renderHistory(); }
+  else if(state.tab==='settings'){ el.innerHTML = renderSettings(); bindSettingsEvents(); }
+
+  document.querySelectorAll('.tab-btn').forEach(b=>{
+    b.classList.toggle('active', b.dataset.tab===state.tab);
+  });
+}
+
+function bindSettingsEvents(){
+  const fileInput = document.getElementById('restore-file');
+  if(fileInput) fileInput.addEventListener('change', e=>{
+    if(e.target.files[0]) restoreJSON(e.target.files[0]);
+  });
+}
+
+document.addEventListener('click', e=>{
+  const btn = e.target.closest('[data-action]');
+  const tabBtn = e.target.closest('.tab-btn');
+  if(tabBtn){ state.tab = tabBtn.dataset.tab; render(); return; }
+  if(!btn) return;
+  const action = btn.dataset.action;
+
+  if(action==='add-income'){
+    const source = document.getElementById('inc-source').value;
+    const amount = parseFloat(document.getElementById('inc-amount').value);
+    const note = document.getElementById('inc-note').value.trim();
+    if(!amount || amount<=0){ showToast('กรอกจำนวนเงินให้ถูกต้อง'); return; }
+    incomeData.push({id:uid(), date:state.entryDate, source, amount, note});
+    persistIncome(); showToast('บันทึกรายรับแล้ว'); render();
+  }
+  else if(action==='del-income'){
+    incomeData = incomeData.filter(x=>x.id!==btn.dataset.id);
+    persistIncome(); render();
+  }
+  else if(action==='add-expense'){
+    const category = document.getElementById('exp-category').value;
+    const costType = document.getElementById('exp-costtype').value;
+    const payment = document.getElementById('exp-payment').value;
+    const amount = parseFloat(document.getElementById('exp-amount').value);
+    const note = document.getElementById('exp-note').value.trim();
+    if(!amount || amount<=0){ showToast('กรอกจำนวนเงินให้ถูกต้อง'); return; }
+    expenseData.push({id:uid(), date:state.entryDate, category, costType, payment, amount, note});
+    persistExpense(); showToast('บันทึกรายจ่ายแล้ว'); render();
+  }
+  else if(action==='del-expense'){
+    expenseData = expenseData.filter(x=>x.id!==btn.dataset.id);
+    persistExpense(); render();
+  }
+  else if(action==='hist-view'){
+    state.histView = btn.dataset.view; render();
+  }
+  else if(action==='hist-detail'){
+    showHistDetail(btn.dataset.key);
+  }
+  else if(action==='close-modal'){
+    btn.closest('.modal-bg').remove();
+  }
+  else if(action==='export-csv'){
+    exportCSV();
+  }
+  else if(action==='export-pdf'){
+    window.print();
+  }
+  else if(action==='add-cat'){
+    const input = document.getElementById('new-cat-name');
+    const name = input.value.trim();
+    if(!name){ showToast('กรอกชื่อหมวดก่อน'); return; }
+    if(catMap[name]){ showToast('มีหมวดนี้อยู่แล้ว'); return; }
+    catMap[name] = 'Variable';
+    persistCats(); showToast('เพิ่มหมวดแล้ว'); render();
+  }
+  else if(action==='del-cat'){
+    delete catMap[btn.dataset.cat];
+    persistCats(); render();
+  }
+});
+
+document.addEventListener('change', e=>{
+  if(e.target.dataset.action==='change-cattype'){
+    catMap[e.target.dataset.cat] = e.target.value;
+    persistCats();
+  }
+});
+
+render();
+</script>
+</body>
+</html>
