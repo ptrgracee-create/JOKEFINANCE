@@ -264,6 +264,7 @@ const DEFAULT_CATS = [
 ];
 const INCOME_SOURCES = ['ยอดขายหน้าร้าน (เงินสด)','โอนเงิน','Grab','Lineman','อื่นๆ'];
 const PAYMENT_METHODS = ['เงินสด','โอนเงิน','บัตรเครดิต'];
+const GP_RATES = {'Grab':0.30, 'Lineman':0.32};
 
 function loadJSON(key, fallback){
   try{
@@ -361,8 +362,12 @@ function renderDaily(){
       <div class="field"><label>ช่องทาง</label>
         <select id="inc-source">${srcOptions}</select>
       </div>
+      <div class="field" id="inc-gross-wrap" style="display:none;">
+        <label>ยอดขายเต็ม ก่อนหัก GP <span id="inc-gp-rate">0</span>% (บาท)</label>
+        <input type="number" inputmode="decimal" id="inc-gross" placeholder="0">
+      </div>
       <div class="row2">
-        <div class="field"><label>จำนวนเงิน (บาท)</label><input type="number" inputmode="decimal" id="inc-amount" placeholder="0"></div>
+        <div class="field"><label id="inc-amount-label">จำนวนเงิน (บาท)</label><input type="number" inputmode="decimal" id="inc-amount" placeholder="0"></div>
         <div class="field"><label>หมายเหตุ (ถ้ามี)</label><input type="text" id="inc-note" placeholder="เช่น ลูกค้าประจำ"></div>
       </div>
       <button class="btn btn-primary" data-action="add-income">บันทึกรายรับ</button>
@@ -373,9 +378,11 @@ function renderDaily(){
             <div class="entry-item">
               <div class="entry-main">
                 <div class="entry-title">${x.source}</div>
+                ${x.gross ? `<div class="entry-note">ยอดเต็ม ${fmt(x.gross)} ฿ · หัก GP ${fmt(x.gross-x.amount)} ฿</div>` : ''}
                 ${x.note ? `<div class="entry-note">${x.note}</div>` : ''}
               </div>
               <div class="entry-amt" style="color:var(--income)">+${fmt(x.amount)} ฿</div>
+              <button class="btn-del" data-action="edit-income" data-id="${x.id}" style="color:var(--brand-dark);">แก้ไข</button>
               <button class="btn-del" data-action="del-income" data-id="${x.id}">ลบ</button>
             </div>`).join('')
         }
@@ -414,6 +421,7 @@ function renderDaily(){
                 <div class="entry-note">${x.payment||'เงินสด'}${x.note ? ' · '+x.note : ''}</div>
               </div>
               <div class="entry-amt" style="color:var(--expense)">-${fmt(x.amount)} ฿</div>
+              <button class="btn-del" data-action="edit-expense" data-id="${x.id}" style="color:var(--brand-dark);">แก้ไข</button>
               <button class="btn-del" data-action="del-expense" data-id="${x.id}">ลบ</button>
             </div>`).join('')
         }
@@ -432,6 +440,36 @@ function bindDailyEvents(){
     catSel.addEventListener('change', ()=>{ costSel.value = catMap[catSel.value] || 'Variable'; });
     costSel.value = catMap[catSel.value] || 'Variable';
   }
+
+  const incSource = document.getElementById('inc-source');
+  const grossWrap = document.getElementById('inc-gross-wrap');
+  const grossInput = document.getElementById('inc-gross');
+  const amountInput = document.getElementById('inc-amount');
+  const amountLabel = document.getElementById('inc-amount-label');
+  const rateLabel = document.getElementById('inc-gp-rate');
+
+  function updateGPUI(){
+    const rate = GP_RATES[incSource.value];
+    if(rate){
+      grossWrap.style.display = 'block';
+      rateLabel.textContent = (rate*100).toFixed(0);
+      amountLabel.textContent = 'ยอดสุทธิหลังหัก GP (บาท)';
+      amountInput.readOnly = true;
+      amountInput.style.background = 'var(--surface)';
+      amountInput.value = grossInput.value ? (parseFloat(grossInput.value)*(1-rate)).toFixed(2) : '';
+    } else {
+      grossWrap.style.display = 'none';
+      amountLabel.textContent = 'จำนวนเงิน (บาท)';
+      amountInput.readOnly = false;
+      amountInput.style.background = '';
+    }
+  }
+  incSource.addEventListener('change', ()=>{ grossInput.value=''; amountInput.value=''; updateGPUI(); });
+  grossInput.addEventListener('input', ()=>{
+    const rate = GP_RATES[incSource.value];
+    if(rate) amountInput.value = grossInput.value ? (parseFloat(grossInput.value)*(1-rate)).toFixed(2) : '';
+  });
+  updateGPUI();
 }
 
 /* ══════════════════════════ Render: Dashboard tab ══════════════════════════ */
@@ -572,6 +610,98 @@ function renderHistory(){
   `;
 }
 
+function showEditIncomeModal(id){
+  const x = incomeData.find(i=>i.id===id);
+  if(!x) return;
+  const rate = GP_RATES[x.source];
+  const bg = document.createElement('div');
+  bg.className = 'modal-bg';
+  bg.innerHTML = `
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <h3>แก้ไขรายรับ</h3>
+      <div class="field"><label>วันที่</label><input type="date" id="edit-inc-date" value="${x.date}"></div>
+      <div class="field"><label>ช่องทาง</label>
+        <select id="edit-inc-source">${INCOME_SOURCES.map(s=>`<option value="${s}" ${s===x.source?'selected':''}>${s}</option>`).join('')}</select>
+      </div>
+      <div class="field" id="edit-inc-gross-wrap" style="display:${rate?'block':'none'};">
+        <label>ยอดขายเต็ม ก่อนหัก GP <span id="edit-inc-gp-rate">${rate?(rate*100).toFixed(0):0}</span>% (บาท)</label>
+        <input type="number" inputmode="decimal" id="edit-inc-gross" value="${x.gross||''}">
+      </div>
+      <div class="field"><label id="edit-inc-amount-label">${rate?'ยอดสุทธิหลังหัก GP (บาท)':'จำนวนเงิน (บาท)'}</label><input type="number" inputmode="decimal" id="edit-inc-amount" value="${x.amount}" ${rate?'readonly':''}></div>
+      <div class="field"><label>หมายเหตุ</label><input type="text" id="edit-inc-note" value="${(x.note||'').replace(/"/g,'&quot;')}"></div>
+      <div class="row2">
+        <button class="btn btn-ghost" data-action="close-modal">ยกเลิก</button>
+        <button class="btn btn-primary" data-action="save-edit-income" data-id="${x.id}">บันทึกการแก้ไข</button>
+      </div>
+    </div>`;
+  bg.addEventListener('click', e=>{ if(e.target===bg) bg.remove(); });
+  document.body.appendChild(bg);
+
+  const srcSel = bg.querySelector('#edit-inc-source');
+  const grossWrap = bg.querySelector('#edit-inc-gross-wrap');
+  const grossInput = bg.querySelector('#edit-inc-gross');
+  const amountInput = bg.querySelector('#edit-inc-amount');
+  const amountLabel = bg.querySelector('#edit-inc-amount-label');
+  const rateLabel = bg.querySelector('#edit-inc-gp-rate');
+  function updateUI(){
+    const r = GP_RATES[srcSel.value];
+    if(r){
+      grossWrap.style.display='block';
+      rateLabel.textContent=(r*100).toFixed(0);
+      amountLabel.textContent='ยอดสุทธิหลังหัก GP (บาท)';
+      amountInput.readOnly = true;
+      if(grossInput.value) amountInput.value = (parseFloat(grossInput.value)*(1-r)).toFixed(2);
+    } else {
+      grossWrap.style.display='none';
+      amountLabel.textContent='จำนวนเงิน (บาท)';
+      amountInput.readOnly = false;
+    }
+  }
+  srcSel.addEventListener('change', updateUI);
+  grossInput.addEventListener('input', ()=>{
+    const r = GP_RATES[srcSel.value];
+    if(r) amountInput.value = grossInput.value ? (parseFloat(grossInput.value)*(1-r)).toFixed(2) : '';
+  });
+}
+
+function showEditExpenseModal(id){
+  const x = expenseData.find(i=>i.id===id);
+  if(!x) return;
+  const catOptions = Object.keys(catMap).map(c=>`<option value="${c}" ${c===x.category?'selected':''}>${c}</option>`).join('');
+  const bg = document.createElement('div');
+  bg.className = 'modal-bg';
+  bg.innerHTML = `
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <h3>แก้ไขรายจ่าย</h3>
+      <div class="field"><label>วันที่</label><input type="date" id="edit-exp-date" value="${x.date}"></div>
+      <div class="row2">
+        <div class="field"><label>หมวดหมู่</label><select id="edit-exp-category">${catOptions}</select></div>
+        <div class="field"><label>ประเภทต้นทุน</label>
+          <select id="edit-exp-costtype">
+            <option value="Fix" ${x.costType==='Fix'?'selected':''}>Fix Cost</option>
+            <option value="Variable" ${x.costType==='Variable'?'selected':''}>Variable Cost</option>
+            <option value="One-time" ${x.costType==='One-time'?'selected':''}>One-time Cost</option>
+          </select>
+        </div>
+      </div>
+      <div class="row2">
+        <div class="field"><label>จ่ายแบบไหน</label>
+          <select id="edit-exp-payment">${PAYMENT_METHODS.map(p=>`<option value="${p}" ${p===(x.payment||'เงินสด')?'selected':''}>${p}</option>`).join('')}</select>
+        </div>
+        <div class="field"><label>จำนวนเงิน (บาท)</label><input type="number" inputmode="decimal" id="edit-exp-amount" value="${x.amount}"></div>
+      </div>
+      <div class="field"><label>หมายเหตุ</label><input type="text" id="edit-exp-note" value="${(x.note||'').replace(/"/g,'&quot;')}"></div>
+      <div class="row2">
+        <button class="btn btn-ghost" data-action="close-modal">ยกเลิก</button>
+        <button class="btn btn-primary" data-action="save-edit-expense" data-id="${x.id}">บันทึกการแก้ไข</button>
+      </div>
+    </div>`;
+  bg.addEventListener('click', e=>{ if(e.target===bg) bg.remove(); });
+  document.body.appendChild(bg);
+}
+
 function showHistDetail(key){
   const view = state.histView;
   const keyFn = view==='day' ? (d=>d) : view==='week' ? weekKey : view==='month' ? monthKey : yearKey;
@@ -586,7 +716,7 @@ function showHistDetail(key){
       <h3>${periodLabel(view,key)}</h3>
       <div style="margin-bottom:10px; font-weight:600;">รายรับ</div>
       ${incs.length===0?'<div class="empty-note">ไม่มีรายรับ</div>':incs.map(x=>`
-        <div class="entry-item"><div class="entry-main"><div class="entry-title">${x.source}</div><div class="entry-note">${thaiDate(x.date)}${x.note?' · '+x.note:''}</div></div><div class="entry-amt" style="color:var(--income)">+${fmt(x.amount)} ฿</div></div>
+        <div class="entry-item"><div class="entry-main"><div class="entry-title">${x.source}</div><div class="entry-note">${thaiDate(x.date)}${x.gross?` · ยอดเต็ม ${fmt(x.gross)} ฿ (หัก GP ${fmt(x.gross-x.amount)} ฿)`:''}${x.note?' · '+x.note:''}</div></div><div class="entry-amt" style="color:var(--income)">+${fmt(x.amount)} ฿</div></div>
       `).join('')}
       <div style="margin:14px 0 10px; font-weight:600;">รายจ่าย</div>
       ${exps.length===0?'<div class="empty-note">ไม่มีรายจ่าย</div>':exps.map(x=>`
@@ -600,12 +730,12 @@ function showHistDetail(key){
 }
 
 function exportCSV(){
-  let csv = 'ประเภทรายการ,วันที่,หมวดหมู่/ช่องทาง,ประเภทต้นทุน,จ่ายแบบไหน,จำนวนเงิน,หมายเหตุ\n';
+  let csv = 'ประเภทรายการ,วันที่,หมวดหมู่/ช่องทาง,ประเภทต้นทุน,จ่ายแบบไหน,จำนวนเงิน,ยอดเต็มก่อนหัก GP,หมายเหตุ\n';
   incomeData.slice().sort((a,b)=>a.date.localeCompare(b.date)).forEach(x=>{
-    csv += `รายรับ,${x.date},"${x.source}",-,-,${x.amount},"${(x.note||'').replace(/"/g,'')}"\n`;
+    csv += `รายรับ,${x.date},"${x.source}",-,-,${x.amount},${x.gross||''},"${(x.note||'').replace(/"/g,'')}"\n`;
   });
   expenseData.slice().sort((a,b)=>a.date.localeCompare(b.date)).forEach(x=>{
-    csv += `รายจ่าย,${x.date},"${x.category}",${x.costType},${x.payment||'เงินสด'},${x.amount},"${(x.note||'').replace(/"/g,'')}"\n`;
+    csv += `รายจ่าย,${x.date},"${x.category}",${x.costType},${x.payment||'เงินสด'},${x.amount},,"${(x.note||'').replace(/"/g,'')}"\n`;
   });
   const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8;'});
   const url = URL.createObjectURL(blob);
@@ -712,10 +842,19 @@ document.addEventListener('click', e=>{
 
   if(action==='add-income'){
     const source = document.getElementById('inc-source').value;
-    const amount = parseFloat(document.getElementById('inc-amount').value);
+    const rate = GP_RATES[source];
+    const grossVal = document.getElementById('inc-gross').value;
+    let amount, gross = null;
+    if(rate){
+      if(!grossVal || parseFloat(grossVal)<=0){ showToast('กรอกยอดขายเต็มก่อนหัก GP'); return; }
+      gross = parseFloat(grossVal);
+      amount = +(gross*(1-rate)).toFixed(2);
+    } else {
+      amount = parseFloat(document.getElementById('inc-amount').value);
+      if(!amount || amount<=0){ showToast('กรอกจำนวนเงินให้ถูกต้อง'); return; }
+    }
     const note = document.getElementById('inc-note').value.trim();
-    if(!amount || amount<=0){ showToast('กรอกจำนวนเงินให้ถูกต้อง'); return; }
-    incomeData.push({id:uid(), date:state.entryDate, source, amount, note});
+    incomeData.push({id:uid(), date:state.entryDate, source, amount, gross, note});
     persistIncome(); showToast('บันทึกรายรับแล้ว'); render();
   }
   else if(action==='del-income'){
@@ -738,6 +877,52 @@ document.addEventListener('click', e=>{
   }
   else if(action==='hist-view'){
     state.histView = btn.dataset.view; render();
+  }
+  else if(action==='edit-income'){
+    showEditIncomeModal(btn.dataset.id);
+  }
+  else if(action==='edit-expense'){
+    showEditExpenseModal(btn.dataset.id);
+  }
+  else if(action==='save-edit-income'){
+    const modal = btn.closest('.modal-bg');
+    const item = incomeData.find(i=>i.id===btn.dataset.id);
+    if(!item) return;
+    const date = modal.querySelector('#edit-inc-date').value;
+    const source = modal.querySelector('#edit-inc-source').value;
+    const rate = GP_RATES[source];
+    let amount, gross = null;
+    if(rate){
+      const g = parseFloat(modal.querySelector('#edit-inc-gross').value);
+      if(!g || g<=0){ showToast('กรอกยอดเต็มก่อนหัก GP'); return; }
+      gross = g; amount = +(g*(1-rate)).toFixed(2);
+    } else {
+      amount = parseFloat(modal.querySelector('#edit-inc-amount').value);
+      if(!amount || amount<=0){ showToast('กรอกจำนวนเงินให้ถูกต้อง'); return; }
+    }
+    const note = modal.querySelector('#edit-inc-note').value.trim();
+    Object.assign(item, {date, source, amount, gross, note});
+    persistIncome();
+    modal.remove();
+    showToast('แก้ไขรายรับแล้ว');
+    render();
+  }
+  else if(action==='save-edit-expense'){
+    const modal = btn.closest('.modal-bg');
+    const item = expenseData.find(i=>i.id===btn.dataset.id);
+    if(!item) return;
+    const date = modal.querySelector('#edit-exp-date').value;
+    const category = modal.querySelector('#edit-exp-category').value;
+    const costType = modal.querySelector('#edit-exp-costtype').value;
+    const payment = modal.querySelector('#edit-exp-payment').value;
+    const amount = parseFloat(modal.querySelector('#edit-exp-amount').value);
+    if(!amount || amount<=0){ showToast('กรอกจำนวนเงินให้ถูกต้อง'); return; }
+    const note = modal.querySelector('#edit-exp-note').value.trim();
+    Object.assign(item, {date, category, costType, payment, amount, note});
+    persistExpense();
+    modal.remove();
+    showToast('แก้ไขรายจ่ายแล้ว');
+    render();
   }
   else if(action==='hist-detail'){
     showHistDetail(btn.dataset.key);
