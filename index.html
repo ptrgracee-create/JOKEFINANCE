@@ -308,6 +308,32 @@ function weekKey(dStr){
   const monday = new Date(d); monday.setDate(d.getDate()-day);
   return monday.toISOString().slice(0,10);
 }
+function cycleKeyGen(cutoffDay){
+  return function(dStr){
+    const d = new Date(dStr+'T00:00:00');
+    let y = d.getFullYear(), m = d.getMonth();
+    if(d.getDate() < cutoffDay){ m -= 1; if(m<0){ m=11; y-=1; } }
+    return `${y}-${String(m+1).padStart(2,'0')}`;
+  };
+}
+function cycleLabelGen(cutoffDay){
+  return function(key){
+    const [y,m] = key.split('-').map(Number);
+    const start = new Date(y, m-1, cutoffDay);
+    let endY=y, endM=m+1; if(endM>12){endM=1;endY++;}
+    const end = new Date(endY, endM-1, cutoffDay-1);
+    const f = d=>thaiDate(d.toISOString().slice(0,10));
+    return `${f(start)} - ${f(end)}`;
+  };
+}
+const bizCycleKey = cycleKeyGen(6);      // ร้าน: ตัดรอบวันที่ 6 - 5 เดือนถัดไป
+const bizCycleLabel = cycleLabelGen(6);
+const cardCycleKey = cycleKeyGen(11);    // บัตรเครดิต: ตัดรอบวันที่ 11 - 10 เดือนถัดไป จ่าย 25
+function cardCycleDue(key){
+  const [y,m] = key.split('-').map(Number);
+  let dueY=y, dueM=m+1; if(dueM>12){dueM=1;dueY++;}
+  return thaiDate(new Date(dueY, dueM-1, 25).toISOString().slice(0,10));
+}
 function thaiDate(dStr){
   const d = new Date(dStr+'T00:00:00');
   const months=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
@@ -475,36 +501,54 @@ function bindDailyEvents(){
 /* ══════════════════════════ Render: Dashboard tab ══════════════════════════ */
 function renderDashboard(){
   const today = todayStr();
-  const mKey = monthKey(today);
+  const mKey = bizCycleKey(today);
+  const cycleRange = bizCycleLabel(mKey);
 
   const incToday = sumBy(incomeData, x=>x.date===today);
   const expToday = sumBy(expenseData, x=>x.date===today);
   const profitToday = incToday - expToday;
 
-  const incMonth = sumBy(incomeData, x=>monthKey(x.date)===mKey);
-  const expMonth = sumBy(expenseData, x=>monthKey(x.date)===mKey);
+  const incMonth = sumBy(incomeData, x=>bizCycleKey(x.date)===mKey);
+  const expMonth = sumBy(expenseData, x=>bizCycleKey(x.date)===mKey);
   const profitMonth = incMonth - expMonth;
 
-  const fixMonth = sumBy(expenseData, x=>monthKey(x.date)===mKey && x.costType==='Fix');
+  const fixMonth = sumBy(expenseData, x=>bizCycleKey(x.date)===mKey && x.costType==='Fix');
 
-  // category breakdown this month
+  // category breakdown this cycle
   const catTotals = {};
-  expenseData.filter(x=>monthKey(x.date)===mKey).forEach(x=>{
+  expenseData.filter(x=>bizCycleKey(x.date)===mKey).forEach(x=>{
     catTotals[x.category] = (catTotals[x.category]||0) + Number(x.amount);
   });
   const catEntries = Object.entries(catTotals).sort((a,b)=>b[1]-a[1]);
   const topCat = catEntries.length ? catEntries[0][0] : '—';
   const maxCatVal = catEntries.length ? catEntries[0][1] : 1;
 
-  // payment method breakdown this month
+  // payment method breakdown this cycle
   const payTotals = {};
-  expenseData.filter(x=>monthKey(x.date)===mKey).forEach(x=>{
+  expenseData.filter(x=>bizCycleKey(x.date)===mKey).forEach(x=>{
     const p = x.payment || 'เงินสด';
     payTotals[p] = (payTotals[p]||0) + Number(x.amount);
   });
   const payEntries = PAYMENT_METHODS.map(p=>[p, payTotals[p]||0]);
   const maxPayVal = Math.max(1, ...payEntries.map(p=>p[1]));
   const payColors = {'เงินสด':'var(--income)','โอนเงิน':'var(--brand)','บัตรเครดิต':'var(--onetime)'};
+
+  // credit card statement cycle (11 - 10, due 25th)
+  const cardKey = cardCycleKey(today);
+  const cardRange = cycleLabelGen(11)(cardKey);
+  const cardDue = cardCycleDue(cardKey);
+  const cardTotal = sumBy(expenseData, x=>(x.payment==='บัตรเครดิต') && cardCycleKey(x.date)===cardKey);
+
+  // itemized breakdown by note (e.g. "ไข่" under "วัตถุดิบ") for this cycle
+  const itemTotals = {};
+  expenseData.filter(x=>bizCycleKey(x.date)===mKey && x.note && x.note.trim()).forEach(x=>{
+    const noteKey = x.note.trim();
+    const key = `${x.category}::${noteKey}`;
+    if(!itemTotals[key]) itemTotals[key] = {category:x.category, note:noteKey, count:0, total:0};
+    itemTotals[key].count += 1;
+    itemTotals[key].total += Number(x.amount);
+  });
+  const itemEntries = Object.values(itemTotals).sort((a,b)=>b.total-a.total);
 
   // last 7 days income vs expense
   const days = [];
@@ -516,13 +560,22 @@ function renderDashboard(){
   const maxDayVal = Math.max(1, ...days.map(d=>Math.max(d.inc,d.exp)));
 
   return `
+    <div class="card" style="padding:10px 16px; margin-bottom:10px;">
+      <div style="font-size:12.5px; color:var(--text-soft);">รอบบัญชีปัจจุบัน: <strong style="color:var(--text);">${cycleRange}</strong></div>
+    </div>
     <div class="stat-grid">
       <div class="stat income"><div class="stat-label">ยอดขายวันนี้</div><div class="stat-val">${fmt(incToday)} ฿</div></div>
       <div class="stat expense"><div class="stat-label">รายจ่ายวันนี้</div><div class="stat-val">${fmt(expToday)} ฿</div></div>
       <div class="stat"><div class="stat-label">กำไรวันนี้</div><div class="stat-val ${profitToday>=0?'profit-pos':'profit-neg'}">${profitToday>=0?'+':''}${fmt(profitToday)} ฿</div></div>
-      <div class="stat"><div class="stat-label">กำไรสะสมเดือนนี้</div><div class="stat-val ${profitMonth>=0?'profit-pos':'profit-neg'}">${profitMonth>=0?'+':''}${fmt(profitMonth)} ฿</div></div>
-      <div class="stat"><div class="stat-label">หมวดใช้เงินเยอะสุด (เดือนนี้)</div><div class="stat-val" style="font-size:15px;">${topCat}</div></div>
-      <div class="stat"><div class="stat-label">Fix Cost เดือนนี้</div><div class="stat-val">${fmt(fixMonth)} ฿</div></div>
+      <div class="stat"><div class="stat-label">กำไรสะสมรอบนี้</div><div class="stat-val ${profitMonth>=0?'profit-pos':'profit-neg'}">${profitMonth>=0?'+':''}${fmt(profitMonth)} ฿</div></div>
+      <div class="stat"><div class="stat-label">หมวดใช้เงินเยอะสุด (รอบนี้)</div><div class="stat-val" style="font-size:15px;">${topCat}</div></div>
+      <div class="stat"><div class="stat-label">Fix Cost รอบนี้</div><div class="stat-val">${fmt(fixMonth)} ฿</div></div>
+    </div>
+
+    <div class="card">
+      <h3>💳 บัตรเครดิต - รอบสเตทเมนต์ปัจจุบัน</h3>
+      <div style="font-size:12.5px; color:var(--text-soft); margin-bottom:6px;">ยอดซื้อ ${cardRange} · กำหนดจ่าย ${cardDue}</div>
+      <div style="font-family:'Kanit',sans-serif; font-weight:700; font-size:24px; color:var(--onetime);">${fmt(cardTotal)} ฿</div>
     </div>
 
     <div class="card">
@@ -544,8 +597,8 @@ function renderDashboard(){
     </div>
 
     <div class="card">
-      <h3>รายจ่ายแยกตามหมวด (เดือนนี้)</h3>
-      ${catEntries.length===0 ? '<div class="empty-note">ยังไม่มีรายจ่ายเดือนนี้</div>' :
+      <h3>รายจ่ายแยกตามหมวด (รอบนี้)</h3>
+      ${catEntries.length===0 ? '<div class="empty-note">ยังไม่มีรายจ่ายรอบนี้</div>' :
         catEntries.map(([cat,val])=>`
           <div class="bar-row">
             <div class="bar-label">${cat}</div>
@@ -557,8 +610,8 @@ function renderDashboard(){
     </div>
 
     <div class="card">
-      <h3>รายจ่ายแยกตามวิธีจ่าย (เดือนนี้)</h3>
-      ${expMonth===0 ? '<div class="empty-note">ยังไม่มีรายจ่ายเดือนนี้</div>' :
+      <h3>รายจ่ายแยกตามวิธีจ่าย (รอบนี้)</h3>
+      ${expMonth===0 ? '<div class="empty-note">ยังไม่มีรายจ่ายรอบนี้</div>' :
         payEntries.map(([method,val])=>`
           <div class="bar-row">
             <div class="bar-label">${method}</div>
@@ -568,12 +621,27 @@ function renderDashboard(){
         `).join('')
       }
     </div>
+
+    <div class="card">
+      <h3>รายการที่ซื้อ (แยกตามหมายเหตุ, รอบนี้)</h3>
+      ${itemEntries.length===0 ? '<div class="empty-note">ยังไม่มีรายจ่ายที่ใส่หมายเหตุในรอบนี้</div>' :
+        itemEntries.map(it=>`
+          <div class="entry-item">
+            <div class="entry-main">
+              <div class="entry-title">${it.note}</div>
+              <div class="entry-note">${it.category} · สั่ง ${it.count} ครั้ง</div>
+            </div>
+            <div class="entry-amt" style="color:var(--expense)">${fmt(it.total)} ฿</div>
+          </div>
+        `).join('')
+      }
+    </div>
   `;
 }
 
 /* ══════════════════════════ Render: History tab ══════════════════════════ */
 function aggregateHistory(view){
-  const keyFn = view==='day' ? (d=>d) : view==='week' ? weekKey : view==='month' ? monthKey : yearKey;
+  const keyFn = view==='day' ? (d=>d) : view==='week' ? weekKey : view==='month' ? bizCycleKey : yearKey;
   const map = {};
   incomeData.forEach(x=>{
     const k = keyFn(x.date);
@@ -591,9 +659,7 @@ function periodLabel(view, key){
   if(view==='day') return thaiDate(key);
   if(view==='week') return `สัปดาห์ของ ${thaiDate(key)}`;
   if(view==='month'){
-    const [y,m] = key.split('-');
-    const months=['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
-    return `${months[Number(m)-1]} ${Number(y)+543}`;
+    return `รอบ ${bizCycleLabel(key)}`;
   }
   return `พ.ศ. ${Number(key)+543}`;
 }
@@ -727,7 +793,7 @@ function showEditExpenseModal(id){
 
 function showHistDetail(key){
   const view = state.histView;
-  const keyFn = view==='day' ? (d=>d) : view==='week' ? weekKey : view==='month' ? monthKey : yearKey;
+  const keyFn = view==='day' ? (d=>d) : view==='week' ? weekKey : view==='month' ? bizCycleKey : yearKey;
   const incs = incomeData.filter(x=>keyFn(x.date)===key).sort((a,b)=>a.date.localeCompare(b.date));
   const exps = expenseData.filter(x=>keyFn(x.date)===key).sort((a,b)=>a.date.localeCompare(b.date));
 
@@ -739,11 +805,11 @@ function showHistDetail(key){
       <h3>${periodLabel(view,key)}</h3>
       <div style="margin-bottom:10px; font-weight:600;">รายรับ</div>
       ${incs.length===0?'<div class="empty-note">ไม่มีรายรับ</div>':incs.map(x=>`
-        <div class="entry-item"><div class="entry-main"><div class="entry-title">${x.source}</div><div class="entry-note">${thaiDate(x.date)}${x.gross?` · ยอดเต็ม ${fmt(x.gross)} ฿ (หัก GP ${fmt(x.gross-x.amount)} ฿)`:''}${x.note?' · '+x.note:''}</div></div><div class="entry-amt" style="color:var(--income)">+${fmt(x.amount)} ฿</div></div>
+        <div class="entry-item"><div class="entry-main"><div class="entry-title">${x.source}</div><div class="entry-note">${thaiDate(x.date)}${x.gross?` · ยอดเต็ม ${fmt(x.gross)} ฿ (หัก GP ${fmt(x.gross-x.amount)} ฿)`:''}${x.note?' · '+x.note:''}</div></div><div class="entry-amt" style="color:var(--income)">+${fmt(x.amount)} ฿</div><button class="btn-del" data-action="edit-income" data-id="${x.id}" style="color:var(--brand-dark);">แก้ไข</button><button class="btn-del" data-action="del-income" data-id="${x.id}">ลบ</button></div>
       `).join('')}
       <div style="margin:14px 0 10px; font-weight:600;">รายจ่าย</div>
       ${exps.length===0?'<div class="empty-note">ไม่มีรายจ่าย</div>':exps.map(x=>`
-        <div class="entry-item"><div class="entry-main"><div class="entry-title">${x.category} <span class="tag tag-${x.costType.toLowerCase().replace('-','')}">${x.costType}</span></div><div class="entry-note">${thaiDate(x.date)} · ${x.payment||'เงินสด'}${x.note?' · '+x.note:''}</div></div><div class="entry-amt" style="color:var(--expense)">-${fmt(x.amount)} ฿</div></div>
+        <div class="entry-item"><div class="entry-main"><div class="entry-title">${x.category} <span class="tag tag-${x.costType.toLowerCase().replace('-','')}">${x.costType}</span></div><div class="entry-note">${thaiDate(x.date)} · ${x.payment||'เงินสด'}${x.note?' · '+x.note:''}</div></div><div class="entry-amt" style="color:var(--expense)">-${fmt(x.amount)} ฿</div><button class="btn-del" data-action="edit-expense" data-id="${x.id}" style="color:var(--brand-dark);">แก้ไข</button><button class="btn-del" data-action="del-expense" data-id="${x.id}">ลบ</button></div>
       `).join('')}
       <button class="btn btn-ghost" style="width:100%; margin-top:14px;" data-action="close-modal">ปิด</button>
     </div>
@@ -925,7 +991,10 @@ document.addEventListener('click', e=>{
   }
   else if(action==='del-income'){
     incomeData = incomeData.filter(x=>x.id!==btn.dataset.id);
-    persistIncome(); render();
+    persistIncome();
+    const parentModal = btn.closest('.modal-bg');
+    if(parentModal) parentModal.remove();
+    render();
   }
   else if(action==='add-expense'){
     const category = document.getElementById('exp-category').value;
@@ -939,15 +1008,22 @@ document.addEventListener('click', e=>{
   }
   else if(action==='del-expense'){
     expenseData = expenseData.filter(x=>x.id!==btn.dataset.id);
-    persistExpense(); render();
+    persistExpense();
+    const parentModal = btn.closest('.modal-bg');
+    if(parentModal) parentModal.remove();
+    render();
   }
   else if(action==='hist-view'){
     state.histView = btn.dataset.view; render();
   }
   else if(action==='edit-income'){
+    const parentModal = btn.closest('.modal-bg');
+    if(parentModal) parentModal.remove();
     showEditIncomeModal(btn.dataset.id);
   }
   else if(action==='edit-expense'){
+    const parentModal = btn.closest('.modal-bg');
+    if(parentModal) parentModal.remove();
     showEditExpenseModal(btn.dataset.id);
   }
   else if(action==='save-edit-income'){
